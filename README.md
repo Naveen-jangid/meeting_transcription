@@ -1,1 +1,87 @@
-# meeting_transcription
+# Fireflies-like Meeting Engine – Dev Blueprint (FastAPI + Celery + Mongo + Whisper + GPT)
+
+A production-oriented reference architecture you can clone and run. Includes service layout, data models, jobs pipeline, prompts, and security patterns.
+
+## Repository layout
+
+```
+fire-meeting-engine/
+├─ api/
+│  ├─ main.py                  # FastAPI app (ingest, status, search, export)
+│  ├─ deps.py                  # DI: db, storage, settings
+│  ├─ routers/
+│  │  ├─ meetings.py           # create/upload/ingest, webhook callbacks
+│  │  ├─ transcripts.py        # get captions, timeline, speakers
+│  │  ├─ summaries.py          # get/update summaries & action items
+│  │  ├─ search.py             # keyword + semantic search endpoints
+│  ├─ schemas.py               # Pydantic DTOs for API
+│  └─ auth.py                  # JWT auth + RBAC stubs
+├─ workers/
+│  ├─ celery_app.py            # Celery app, queues, beat schedule
+│  ├─ celeryconfig.py          # Broker/result backends, task routes, retries
+│  ├─ tasks/
+│  │  ├─ ingest.py             # audio normalization, media probe
+│  │  ├─ asr.py                # Whisper / Deepgram transcription
+│  │  ├─ diarize.py            # Pyannote diarization (optional)
+│  │  ├─ align.py              # WhisperX alignment (optional)
+│  │  ├─ enrich.py             # NER, sentiment, filter classification
+│  │  ├─ summarize.py          # LLM summarization & action items
+│  │  ├─ analytics.py          # talk-time, questions, keyword stats
+│  │  ├─ persist.py            # write to Mongo/ES, build indices
+│  │  ├─ nightly_dedup.py      # batch duplication finder w/ temporary index
+│  │  └─ webhooks.py           # send notifications (email/slack/in-app)
+├─ nlp/
+│  ├─ ner.py                   # spaCy/HF NER wrapper
+│  ├─ sentiment.py             # classifier wrapper
+│  ├─ filters.py               # task/note/question labels
+│  ├─ prompts.py               # LLM prompt templates (meeting types)
+│  └─ llm_client.py            # OpenAI/Anthropic/local LLM client
+├─ data/
+│  └─ stopwords.txt
+├─ infra/
+│  ├─ docker-compose.yml
+│  ├─ Dockerfile.api
+│  ├─ Dockerfile.worker
+│  ├─ nginx.conf
+│  └─ k8s/* (optional manifests)
+├─ storage/
+│  ├─ s3.py                    # S3/MinIO client & presigned URLs
+│  └─ local.py                 # local FS fallback
+├─ db/
+│  ├─ mongo.py                 # Mongo client + indices
+│  ├─ es.py                    # Elasticsearch/OpenSearch client + mappings
+│  └─ models.py                # Mongo document shapes
+├─ security/
+│  ├─ sanitize.py              # PII scrubbing before LLM
+│  └─ kms.py                   # KMS envelope encryption helpers
+├─ scripts/
+│  ├─ bootstrap_indices.py     # create ES indexes and analyzers
+│  ├─ create_rbac_roles.py
+│  └─ demo_upload.sh
+├─ tests/
+│  └─ ...
+├─ .env.example
+├─ requirements.txt
+└─ README.md
+```
+
+## Environment & Dependencies
+
+See `requirements.txt` and `.env.example` for core dependencies and environment variables. Optional diarization/alignment dependencies are included for parity with the Fireflies-like pipeline.
+
+## Local development (Docker Compose)
+
+```bash
+docker compose -f infra/docker-compose.yml up --build
+```
+
+## End-to-end flow
+
+1. `POST /meetings/create` → returns `meeting_id` + presigned upload URL.
+2. Client uploads media to S3/MinIO.
+3. `POST /meetings/{id}/uploaded` → triggers Celery pipeline.
+4. ASR → optional diarization → enrichment → LLM summarization → analytics → notification.
+
+## Notes
+
+This blueprint mirrors how Fireflies-style systems are built in practice and can be expanded with real integrations, security controls, and frontend contracts.

@@ -1,0 +1,49 @@
+version: "3.9"
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    env_file: ../.env
+    ports: ["8080:8080"]
+    depends_on: [mongo, redis, elasticsearch, minio]
+
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.worker
+    env_file: ../.env
+    depends_on: [redis, mongo]
+    command: ["celery", "-A", "workers.celery_app:celery", "worker", "-l", "INFO", "-Q", "asr,diarize,enrich,summarize,analytics,persist,notify"]
+
+  beat:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.worker
+    env_file: ../.env
+    depends_on: [redis, worker]
+    command: ["celery", "-A", "workers.celery_app:celery", "beat", "-l", "INFO"]
+
+  mongo:
+    image: mongo:7
+    ports: ["27017:27017"]
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.2
+    environment:
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports: ["9200:9200"]
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: localminio
+      MINIO_ROOT_PASSWORD: localminiosecret
+    ports: ["9000:9000", "9001:9001"]
