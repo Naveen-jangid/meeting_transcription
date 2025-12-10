@@ -69,7 +69,21 @@ fire-meeting-engine/
 
 See `requirements.txt` and `.env.example` for core dependencies and environment variables. Optional diarization/alignment dependencies are included for parity with the Fireflies-like pipeline.
 
-## Local development (Docker Compose)
+## Local development
+
+### Run directly with FastAPI (no Docker)
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+python -m api.main
+```
+
+The app loads environment variables from `.env` on startup and binds to `API_HOST`/`API_PORT` as defined in your environment (defaults to `0.0.0.0:8080`).
+
+### Run with Docker Compose
 
 ```bash
 docker compose -f infra/docker-compose.yml up --build
