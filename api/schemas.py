@@ -8,7 +8,7 @@ class MeetingCreate(BaseModel):
 
 
 class MeetingUpload(BaseModel):
-    s3_key: str
+    local_path: str
 
 
 class Caption(BaseModel):
