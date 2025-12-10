@@ -83,34 +83,6 @@ python -m api.main
 
 The app loads environment variables from `.env` on startup and binds to `API_HOST`/`API_PORT` as defined in your environment (defaults to `0.0.0.0:8080`).
 
-#### Quick cURL checks
-
-```bash
-BASE_URL="http://localhost:8080"
-
-# 1) Create a meeting record (captures your org + file name)
-MEETING_ID=$(curl -s -X POST "${BASE_URL}/meetings/create?file_name=call.mp3&org_id=acme" | jq -r '.meeting_id')
-echo "Meeting ID: ${MEETING_ID}"
-
-# 2) Upload audio directly to the API (stored under data/uploads and triggers pipeline)
-curl -X POST "${BASE_URL}/meetings/${MEETING_ID}/upload" \
-  -F "file=@/absolute/path/to/call.mp3"
-
-# 2b) If a file already exists locally, you can instead mark it uploaded and kick off processing
-curl -X POST "${BASE_URL}/meetings/${MEETING_ID}/uploaded" \
-  -H "Content-Type: application/json" \
-  -d "{\"local_path\":\"data/uploads/${MEETING_ID}_call.mp3\"}"
-
-# 3) Fetch the transcript and summary once processing is complete
-curl "${BASE_URL}/transcripts/${MEETING_ID}"
-curl "${BASE_URL}/summaries/${MEETING_ID}"
-
-# 4) Search for a phrase across indexed captions
-curl "${BASE_URL}/search?q=follow%20up"
-```
-
-The upload endpoints persist files locally and fire the Celery pipeline without any S3 or presigned URL requirements. Common audio formats (mp3, wav, m4a, etc.) are accepted; uploads are converted to wav automatically when ffmpeg is available. The transcript/summary/search endpoints expect your backing MongoDB/Elasticsearch instances to be running with data from the processing pipeline.
-
 ### Run with Docker Compose
 
 ```bash
