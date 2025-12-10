@@ -91,8 +91,8 @@ docker compose -f infra/docker-compose.yml up --build
 
 ## End-to-end flow
 
-1. `POST /meetings/create` → returns `meeting_id` + presigned upload URL.
-2. Client uploads media to S3/MinIO.
+1. `POST /meetings/create` → returns `meeting_id` + suggested local upload path.
+2. Client uploads media directly to the API (stored locally under `data/uploads`).
 3. `POST /meetings/{id}/uploaded` → triggers Celery pipeline.
 4. ASR → optional diarization → enrichment → LLM summarization → analytics → notification.
 
