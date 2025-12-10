@@ -1,8 +1,9 @@
 import json
 import os
+import shutil
 import subprocess
+from pathlib import Path
 from workers.celery_app import celery
-from storage.s3 import download_to_tmp
 from db.mongo import Captions, Meetings
 from workers.tasks.diarize import diarize_audio
 from workers.tasks.enrich import enrich_transcript
@@ -11,7 +12,7 @@ from workers.tasks.enrich import enrich_transcript
 @celery.task(bind=True, max_retries=2)
 def transcribe(self, meeting_id: str):
     meta = Meetings.get(meeting_id)
-    wav = download_to_tmp(meta.get("s3_key", f"{meeting_id}.wav"))
+    wav = _resolve_local_audio(meeting_id, meta)
 
     out_json = wav + ".json"
     cmd = [
@@ -59,3 +60,40 @@ def transcribe(self, meeting_id: str):
 @celery.task()
 def pipeline_entry(meeting_id: str):
     transcribe.delay(meeting_id)
+
+
+def _resolve_local_audio(meeting_id: str, meta: dict) -> str:
+    candidate = meta.get("local_path")
+    if candidate and Path(candidate).exists():
+        return _ensure_wav(Path(candidate))
+
+    file_name = meta.get("file_name") or f"{meeting_id}.wav"
+    fallback = Path("data/uploads") / file_name
+    fallback.parent.mkdir(parents=True, exist_ok=True)
+    fallback.touch(exist_ok=True)
+    return _ensure_wav(fallback)
+
+
+def _ensure_wav(source: Path) -> str:
+    if source.suffix.lower() == ".wav":
+        return str(source)
+
+    wav_target = source.with_suffix(".wav")
+    if wav_target.exists() and wav_target.stat().st_mtime >= source.stat().st_mtime:
+        return str(wav_target)
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return str(source)
+
+    wav_target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(
+            [ffmpeg, "-y", "-i", str(source), str(wav_target)],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return str(wav_target)
+    except Exception:
+        return str(source)
